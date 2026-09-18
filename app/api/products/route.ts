@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { unstable_noStore as noStore } from "next/cache"
 import { parsePrice } from "@/lib/utils/pricing"
+import { MINIMUM_ORDER_VALUE } from "@/lib/orders/minimum-order.server"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -99,7 +100,7 @@ export async function GET() {
     }
     const categories = Array.from(categorySet).sort((a, b) => a.localeCompare(b, "pt-BR"))
 
-    return NextResponse.json({ products: out, categories }, { headers: noStoreHeaders })
+    return NextResponse.json({ products: out, categories, minimumOrderValue: MINIMUM_ORDER_VALUE }, { headers: noStoreHeaders })
   } catch (err: any) {
     console.error("GET /api/products error:", err?.message || err)
     return NextResponse.json({ error: "Internal error while listing products." }, { status: 500 })

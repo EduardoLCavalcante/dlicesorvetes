@@ -49,6 +49,7 @@ export default function DliceEcommerce() {
   const [selectedCategory, setSelectedCategory] = useState<string>(ALL_CATEGORIES)
   const [searchTerm, setSearchTerm] = useState("")
   const [products, setProducts] = useState<ProductWithDefaults[]>([])
+  const [minimumOrderValue, setMinimumOrderValue] = useState<number | null>(null)
   const [categories, setCategories] = useState<string[]>([ALL_CATEGORIES])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -141,6 +142,10 @@ export default function DliceEcommerce() {
         }
 
         const apiProducts: ProductRecord[] = Array.isArray(json?.products) ? json.products : []
+        const backendMinimumOrderValue = Number(json?.minimumOrderValue)
+        if (!Number.isFinite(backendMinimumOrderValue) || backendMinimumOrderValue <= 0) {
+          throw new Error("Não foi possível carregar o valor mínimo do pedido.")
+        }
         const availableProducts = apiProducts.filter((p) => p.is_available !== false)
         const mapped: ProductWithDefaults[] = availableProducts.map((p) => {
           const priceNum = typeof p.price === "number" ? p.price : Number(p.price)
@@ -155,6 +160,7 @@ export default function DliceEcommerce() {
         })
 
         setProducts(mapped)
+        setMinimumOrderValue(backendMinimumOrderValue)
 
         const catsFromApi = Array.isArray(json?.categories) ? (json.categories as string[]) : []
         const catSet = new Set<string>()
@@ -436,6 +442,7 @@ Obrigado pela preferencia!`
         onRetryDeliveryZones={() => void loadDeliveryZones()}
         generateWhatsAppMessage={generateWhatsAppMessage}
         isProcessingOrder={isProcessingOrder}
+        minimumOrderValue={minimumOrderValue}
       />
 
       <ProductModal

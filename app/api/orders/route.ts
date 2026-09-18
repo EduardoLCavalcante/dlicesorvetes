@@ -11,6 +11,7 @@ import {
 } from "@/lib/orders/normalizers"
 import { getSupabaseAdminClient, noStoreHeaders } from "@/lib/supabase/server"
 import { parsePrice } from "@/lib/utils/pricing"
+import { getServerMinimumOrderShortfall, MINIMUM_ORDER_VALUE } from "@/lib/orders/minimum-order.server"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -125,6 +126,16 @@ export async function POST(request: Request) {
     const extrasTotal = roundMoney(
       orderItems.filter((item) => item.line_type === "extra").reduce((total, item) => total + item.line_total, 0),
     )
+    const minimumOrderShortfall = getServerMinimumOrderShortfall(subtotal, extrasTotal)
+    if (minimumOrderShortfall > 0) {
+      return NextResponse.json(
+        {
+          code: "MINIMUM_ORDER_NOT_MET",
+          error: `O pedido mínimo é de R$ ${MINIMUM_ORDER_VALUE.toFixed(2).replace(".", ",")} em produtos e adicionais, sem incluir a taxa de entrega. Faltam R$ ${minimumOrderShortfall.toFixed(2).replace(".", ",")}.`,
+        },
+        { status: 422, headers: noStoreHeaders },
+      )
+    }
     const deliveryFee = deliveryZone?.fee ?? 0
     const total = roundMoney(subtotal + extrasTotal + deliveryFee)
     const submittedName = cleanCustomerName(deliveryInfo.name)
