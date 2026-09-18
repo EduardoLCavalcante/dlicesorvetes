@@ -52,6 +52,7 @@ type CheckoutModalProps = {
   toggleExtra: (extraId: string) => void
   updateExtraQuantity: (extraId: string, quantity: number) => void
   getExtrasTotal: () => number
+  minimumOrderValue: number | null
   adicionais: { id: string; nome: string; preco: number; imagem: string }[]
   deliveryZones: DeliveryZone[]
   deliveryZonesLoading: boolean
@@ -104,6 +105,12 @@ const CheckoutModal = (props: CheckoutModalProps) => {
     [props.deliveryInfo.deliveryZoneId, props.deliveryZones],
   )
   const deliveryFee = props.deliveryInfo.deliveryType === "retirada" ? 0 : selectedDeliveryZone?.fee ?? 0
+  const itemsTotal = props.getTotalPrice() + props.getExtrasTotal()
+  const minimumOrderShortfall = props.minimumOrderValue === null
+    ? null
+    : Math.max(0, Math.round((props.minimumOrderValue - itemsTotal) * 100) / 100)
+  const isMinimumOrderMet = props.minimumOrderValue !== null && minimumOrderShortfall === 0
+  const formatCurrency = (value: number) => `R$ ${value.toFixed(2).replace(".", ",")}`
 
   const isFormValid = useMemo(() => {
     const result = checkoutSchema.safeParse(props.deliveryInfo)
@@ -161,6 +168,14 @@ const CheckoutModal = (props: CheckoutModalProps) => {
       return
     }
     setFormErrors({})
+    if (!isMinimumOrderMet) {
+      setSubmitError(
+        props.minimumOrderValue === null
+          ? "Não foi possível confirmar o valor mínimo do pedido. Tente novamente."
+          : `Adicione mais ${formatCurrency(minimumOrderShortfall || 0)} para atingir o pedido mínimo de ${formatCurrency(props.minimumOrderValue)} (sem taxa de entrega).`,
+      )
+      return
+    }
     setSubmitError(null)
     try {
       await props.generateWhatsAppMessage(saveForNextTime)
@@ -510,6 +525,11 @@ const CheckoutModal = (props: CheckoutModalProps) => {
                           </div>
                         )
                       })()}
+                      {minimumOrderShortfall !== null && minimumOrderShortfall > 0 && props.minimumOrderValue !== null && (
+                        <p className="rounded-xl border border-orange-200 bg-orange-50 p-3 text-sm font-medium text-orange-800">
+                          Faltam {formatCurrency(minimumOrderShortfall)} para o pedido mínimo de {formatCurrency(props.minimumOrderValue)} (sem taxa de entrega).
+                        </p>
+                      )}
                     
                       {Object.keys(formErrors).length > 0 && (
                         <motion.div
@@ -535,7 +555,7 @@ const CheckoutModal = (props: CheckoutModalProps) => {
                       <div className="sticky bottom-0 bg-white pt-4 pb-2 space-y-4 border-t border-orange-100 z-10 -mx-6 px-6 -mb-6 md:-mx-8 md:px-8 md:-mb-8 rounded-b-3xl">
                         <Button
                           onClick={() => void handleSubmit()}
-                          disabled={props.isProcessingOrder || !isFormValid}
+                          disabled={props.isProcessingOrder || !isFormValid || !isMinimumOrderMet}
                           className="w-full bg-green-500 hover:bg-green-600 text-white py-4 rounded-2xl text-lg font-semibold flex items-center justify-center space-x-3 shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {props.isProcessingOrder ? (
@@ -552,8 +572,12 @@ const CheckoutModal = (props: CheckoutModalProps) => {
                         </Button>
 
                         <p className="text-center text-sm text-gray-500">
-                          {!isFormValid 
+                          {!isMinimumOrderMet && props.minimumOrderValue !== null
+                            ? `Adicione mais ${formatCurrency(minimumOrderShortfall || 0)} para atingir o pedido mínimo.`
+                            : !isFormValid
                             ? "Preencha todos os campos obrigatórios primeiro" 
+                            : props.minimumOrderValue === null
+                            ? "Carregando as regras do pedido..."
                             : "Você será redirecionado para o WhatsApp para confirmar seu pedido"}
                         </p>
                       </div>
